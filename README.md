@@ -7,21 +7,12 @@ If you've remapped Caps Lock to Ctrl, you've traded away the one key that told
 you when you were shouting. This puts that back in the tray, and gives you a
 switch to change your mind whenever you like.
 
-```
-Caps Lock: OFF
-──────────────────────────────────────
-Caps key acts as:
-  ● Ctrl  —  Shift+Caps still locks
-  ○ Ctrl  —  locked, Caps Lock disabled
-  ○ Normal Caps Lock
-──────────────────────────────────────
-☐ Force Caps LED on
-Light show                           ▸
-──────────────────────────────────────
-Quit
-```
+![The tray menu open above the Plasma panel: a Caps Lock: OFF readout, radio buttons for what the Caps key acts as, a Force Caps LED on checkbox, a Light show submenu, and Quit](docs/menu.png)
 
-The icon is an `A` badge — solid when the light is on, outlined when it's off.
+The tray icon is the keycap itself — wearing shades when Caps is acting as
+Ctrl, plain when it's an ordinary Caps Lock. It picks up an orange wash while
+Caps Lock is actually on, and a violet one while the LEDs are being driven by
+hand.
 
 ## The three modes
 
