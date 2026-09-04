@@ -1,67 +1,53 @@
 """The tray icon itself."""
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QActionGroup, QColor, QFont, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
-from . import leds, xkb
-
-ON_COLOR = "#e8542f"      # a genuine Caps Lock
-OFF_COLOR = "#8a8a8a"      # dark
-FORCED_COLOR = "#7d5bed"   # driven by hand, not a real lock
+from . import effects, icons, leds, xkb
 
 POLL_MS = 200
 GRACE_TICKS = 3            # let sysfs catch up before trusting a disagreement
 
 
-def make_icon(on, forced=False):
-    """An 'A' badge: filled when the LED is lit, outlined when dark.
-
-    Colours are fixed rather than themed, because Plasma does not recolour
-    StatusNotifierItem pixmaps — these read on light and dark panels alike.
-    """
-    size = 64
-    lit = FORCED_COLOR if forced else ON_COLOR
-    dark = FORCED_COLOR if forced else OFF_COLOR
-    pm = QPixmap(size, size)
-    pm.fill(Qt.transparent)
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.Antialiasing)
-    if on:
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(lit))
-        p.drawRoundedRect(2, 2, size - 4, size - 4, 14, 14)
-        p.setPen(QColor("#ffffff"))
-    else:
-        pen = QPen(QColor(dark))
-        pen.setWidth(5)
-        p.setPen(pen)
-        p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(4, 4, size - 9, size - 9, 13, 13)
-        p.setPen(QColor(dark))
-    font = QFont()
-    font.setPixelSize(38)
-    font.setBold(True)
-    p.setFont(font)
-    p.drawText(pm.rect(), Qt.AlignCenter, "A")
-    p.end()
-    return QIcon(pm)
-
-
 class Indicator:
     def __init__(self, app):
         self.app = app
-        self.icons = {(on, f): make_icon(on, f)
-                      for on in (False, True) for f in (False, True)}
+        self.icons = icons.load_all()
         self.state = False
         self.shown = None
         self.real_state = False
         self.override = None   # None = tracking reality, bool = forced value
         self.grace = 0
 
-        self.can_remap = xkb.backend_available()
-        self.can_force = leds.can_drive_leds()
+        self.show = None       # active Effect, if any
+        self.show_idx = 0
+        self.show_snapshot = None
 
+        self.can_remap = xkb.backend_available()
+        self.can_drive = leds.can_drive()
+        self.effects = effects.build(leds.available())
+
+        self._build_menu()
+
+        self.tray = QSystemTrayIcon()
+        self.tray.setContextMenu(self.menu)
+        self.refresh_mode()
+        self.tick()
+        self.tray.show()
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.tick)
+        self.timer.start(POLL_MS)
+
+        self.show_timer = QTimer()
+        self.show_timer.timeout.connect(self._step_show)
+
+        app.aboutToQuit.connect(self.cleanup)
+
+    # -- menu -------------------------------------------------------------
+
+    def _build_menu(self):
         self.menu = QMenu()
         self.status = self.menu.addAction("Caps Lock: …")
         self.status.setEnabled(False)
@@ -87,25 +73,34 @@ class Indicator:
         self.menu.addSeparator()
         self.force_action = self.menu.addAction("Force Caps LED on")
         self.force_action.setCheckable(True)
-        self.force_action.setEnabled(self.can_force)
+        self.force_action.setEnabled(self.can_drive)
         self.force_action.triggered.connect(self.toggle_force)
-        if not self.can_force:
-            note = self.menu.addAction("   (needs membership in the 'input' group)")
+
+        self.show_menu = self.menu.addMenu("Light show")
+        self.show_menu.setEnabled(self.can_drive and bool(self.effects))
+        show_group = QActionGroup(self.show_menu)
+        show_group.setExclusive(True)
+        self.show_actions = []
+        for effect in self.effects:
+            act = self.show_menu.addAction(effect.label)
+            act.setCheckable(True)
+            show_group.addAction(act)
+            act.triggered.connect(lambda _=False, e=effect: self.start_show(e))
+            self.show_actions.append((act, effect.key))
+        self.show_menu.addSeparator()
+        self.stop_action = self.show_menu.addAction("Stop")
+        self.stop_action.setCheckable(True)
+        self.stop_action.setChecked(True)
+        show_group.addAction(self.stop_action)
+        self.stop_action.triggered.connect(lambda _=False: self.stop_show())
+
+        if not self.can_drive:
+            note = self.menu.addAction("   (LED control needs the 'input' group)")
             note.setEnabled(False)
 
         self.menu.addSeparator()
-        self.menu.addAction("Quit").triggered.connect(app.quit)
+        self.menu.addAction("Quit").triggered.connect(self.app.quit)
         self.menu.aboutToShow.connect(self.refresh_mode)
-
-        self.tray = QSystemTrayIcon()
-        self.tray.setContextMenu(self.menu)
-        self.refresh_mode()
-        self.tick()
-        self.tray.show()
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.tick)
-        self.timer.start(POLL_MS)
 
     # -- mode -------------------------------------------------------------
 
@@ -129,28 +124,84 @@ class Indicator:
     # -- LED --------------------------------------------------------------
 
     def toggle_force(self, checked):
+        self.stop_show()
         if checked:
             self.override = True
-            leds.set_caps_led(True)
+            leds.set_led("capslock", True)
         else:
             self.override = None
-            leds.set_caps_led(self.real_state)
+            leds.set_led("capslock", self.real_state)
         self.grace = GRACE_TICKS
         self.tick()
+
+    # -- light show -------------------------------------------------------
+
+    def start_show(self, effect):
+        if self.show is None:
+            # Only snapshot on the way in, so switching effects mid-show
+            # doesn't capture the effect's own frame as "reality".
+            self.show_snapshot = leds.snapshot()
+        self.override = None
+        self.force_action.setChecked(False)
+        self.show = effect
+        self.show_idx = 0
+        self.show_timer.start(effect.interval)
+        self.update_text()
+
+    def _step_show(self):
+        if self.show is None:
+            return
+        frame = self.show.frames[self.show_idx % len(self.show.frames)]
+        self.show_idx += 1
+        leds.apply_frame(frame)
+
+    def stop_show(self):
+        if self.show is None:
+            return
+        self.show_timer.stop()
+        self.show = None
+        if self.show_snapshot is not None:
+            leds.restore(self.show_snapshot)
+            self.show_snapshot = None
+        for act, _ in self.show_actions:
+            act.setChecked(False)
+        self.stop_action.setChecked(True)
+        self.grace = GRACE_TICKS
+        self.update_text()
+
+    def cleanup(self):
+        """Never leave someone's keyboard lit up on exit."""
+        self.stop_show()
+        if self.override is not None:
+            leds.set_led("capslock", self.real_state)
 
     # -- rendering --------------------------------------------------------
 
     def update_text(self):
-        on = "ON" if self.state else "OFF"
-        forced = self.override is not None
-        label = f"Caps Lock: {on}" + ("  (LED forced)" if forced else "")
+        if self.show is not None:
+            label = "Light show: %s" % self.show.label
+            tip = [label, "Caps key acts as: %s" % self.mode_label()]
+        else:
+            on = "ON" if self.state else "OFF"
+            forced = self.override is not None
+            label = "Caps Lock: %s%s" % (on, "  (LED forced)" if forced else "")
+            tip = [label, "Caps key acts as: %s" % self.mode_label()]
+            if forced:
+                tip.append("LED is driven manually — not the real lock state.")
         self.status.setText(label)
-        tip = [label, f"Caps key acts as: {self.mode_label()}"]
-        if forced:
-            tip.append("LED is driven manually — not the real lock state.")
         self.tray.setToolTip("\n".join(tip))
 
+    def _set_icon(self, key):
+        if key != self.shown:
+            self.shown = key
+            self.tray.setIcon(self.icons[key])
+
     def tick(self):
+        if self.show is not None:
+            # The LEDs are ours right now; infer nothing from them.
+            self._set_icon((True, True))
+            self.update_text()
+            return
         on = leds.caps_led_on()
         if self.grace > 0:
             self.grace -= 1
@@ -161,8 +212,5 @@ class Indicator:
             self.override = None
             self.force_action.setChecked(False)
         self.state = on
-        key = (on, self.override is not None)
-        if key != self.shown:
-            self.shown = key
-            self.tray.setIcon(self.icons[key])
+        self._set_icon((on, self.override is not None))
         self.update_text()

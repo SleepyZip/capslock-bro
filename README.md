@@ -16,6 +16,7 @@ Caps key acts as:
   ○ Normal Caps Lock
 ──────────────────────────────────────
 ☐ Force Caps LED on
+Light show                           ▸
 ──────────────────────────────────────
 Quit
 ```
@@ -51,7 +52,7 @@ which is world-readable, so that part works on any Linux desktop with a tray.
 ## Install
 
 ```bash
-pipx install git+https://github.com/REPLACE_ME/capslock-bro
+pipx install git+https://github.com/SleepyZip/capslock-bro
 capslock-bro --install-autostart
 capslock-bro &
 ```
@@ -59,7 +60,7 @@ capslock-bro &
 Or from a clone:
 
 ```bash
-git clone https://github.com/REPLACE_ME/capslock-bro
+git clone https://github.com/SleepyZip/capslock-bro
 cd capslock-bro
 pip install --user .
 ```
@@ -108,12 +109,55 @@ It's a toy, and it's built so it can't lie to you:
 It's a one-shot write, not a held state — anything that legitimately updates the
 LED wins. That's what keeps it honest instead of fighting the kernel.
 
+While a light show is running the icon stays violet and the app infers nothing
+from the LEDs, since they belong to the effect rather than to your lock state.
+
 ### A note on the `input` group
 
 Adding yourself to `input` (`sudo usermod -aG input $USER`) grants read access
 to every input device on the system, which means any process running as you can
 read your keystrokes. That's a real trade-off, and it's worth understanding
 before you make it for a blinkenlight. The indicator works fine without it.
+
+## Light show
+
+You have three lock LEDs and they are just sitting there.
+
+| Effect | What it does |
+|---|---|
+| **Scanner** | Back and forth, KITT-style |
+| **Chase** | One direction, wrapping around |
+| **Fill** | Fills up from Num Lock, then drains back |
+| **Blink** | All three, together |
+
+Effects are pure data — a list of frames, each frame being the set of LEDs lit
+at that step:
+
+```python
+def _chase(names):
+    return [frozenset([n]) for n in names]
+```
+
+Adding one is a function in `effects.py` and a line in `_BUILDERS`. Effects that
+would degenerate on your hardware — a scanner across a single LED — are dropped
+automatically, so a laptop with one light gets a shorter menu rather than a
+broken one.
+
+Your real lock states are captured when a show starts and restored when it
+stops, including on quit. It will not leave someone's keyboard lit up.
+
+## Custom icons
+
+Drop images into `~/.config/capslock-bro/icons/`, named for the state:
+
+```
+off.svg          on.svg
+forced-off.svg   forced-on.svg
+```
+
+`.svg`, `.png`, `.svgz` and `.xpm` are accepted, first match wins, and anything
+you leave out falls back to the drawn default. Tray icons render around 22px,
+so favour bold shapes over detail.
 
 ## Why not Fn + Caps Lock?
 
