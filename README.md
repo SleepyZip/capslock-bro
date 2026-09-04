@@ -1,6 +1,6 @@
 # Caps Lock Bro
 
-![Logo](assets/ctrl.png)
+![Logo](capslock_bro/assets/ctrl.png)
 
 A tray indicator that tells you whether Caps Lock is on — and lets you change
 what the Caps key actually does, live, without logging out.
