@@ -123,12 +123,13 @@ before you make it for a blinkenlight. The indicator works fine without it.
 
 You have three lock LEDs and they are just sitting there.
 
-| Effect | What it does |
-|---|---|
-| **Scanner** | Back and forth, KITT-style |
-| **Chase** | One direction, wrapping around |
-| **Fill** | Fills up from Num Lock, then drains back |
-| **Blink** | All three, together |
+| Effect | What it does | Cycle |
+|---|---|---|
+| **Scanner** | Back and forth, KITT-style | 0.4s |
+| **Matrix** | One direction, wrapping around | 0.3s |
+| **Fill** | Fills up from Num Lock, then drains back | 0.8s |
+| **Blink** | All three, together | 0.7s |
+| **Laboratory** | Each light gets its own slow beat, then all three, then a long dark pause | 7.7s |
 
 Effects are pure data — a list of frames, each frame being the set of LEDs lit
 at that step:

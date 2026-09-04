@@ -18,7 +18,7 @@ def _scanner(names):
     return forward + forward[-2:0:-1]
 
 
-def _chase(names):
+def _matrix(names):
     """One direction, wrapping around."""
     return [frozenset([n]) for n in names]
 
@@ -35,17 +35,36 @@ def _blink(names):
     return [frozenset(names), frozenset()]
 
 
+def _laboratory(names):
+    """Slow and deliberate: idle equipment ticking over in an empty lab.
+
+    Each light gets its own beat with a dark gap after it, then all three
+    together, then a long pause before it comes round again.
+    """
+    frames = []
+    for n in names:
+        frames.append(frozenset([n]))
+        frames.append(frozenset())
+    frames.append(frozenset(names))
+    frames.append(frozenset())
+    frames.append(frozenset())
+    return frames
+
+
 _BUILDERS = [
     ("scanner", "Scanner", 110, _scanner),
-    ("chase", "Chase", 110, _chase),
+    ("matrix", "Matrix", 110, _matrix),
     ("fill", "Fill", 130, _fill),
     ("blink", "Blink", 350, _blink),
+    ("laboratory", "Laboratory", 850, _laboratory),
 ]
 
 
 def build(names):
     """Effects for the LEDs this machine actually has, skipping degenerate ones."""
     names = tuple(names)
+    if not names:
+        return []
     out = []
     for key, label, interval, builder in _BUILDERS:
         frames = builder(names)
