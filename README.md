@@ -1,5 +1,7 @@
 # Caps Lock Bro
 
+![Logo](assets/ctrl.png)
+
 A tray indicator that tells you whether Caps Lock is on — and lets you change
 what the Caps key actually does, live, without logging out.
 
@@ -13,6 +15,13 @@ The tray icon is the keycap itself — wearing shades when Caps is acting as
 Ctrl, plain when it's an ordinary Caps Lock. It picks up an orange wash while
 Caps Lock is actually on, and a violet one while the LEDs are being driven by
 hand.
+
+
+## AI Use
+
+Is this another vibe coded repo?
+
+Yes it is. 
 
 ## The three modes
 
