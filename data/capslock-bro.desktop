@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Caps Lock Bro
+Comment=Tray indicator for Caps Lock and what the Caps key does
+Exec=capslock-bro
+Icon=input-keyboard
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
