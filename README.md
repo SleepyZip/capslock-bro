@@ -16,12 +16,27 @@ Ctrl, plain when it's an ordinary Caps Lock. It picks up an orange wash while
 Caps Lock is actually on, and a violet one while the LEDs are being driven by
 hand.
 
+## Why this exists
+
+I came to the Realforce R3 from an HHKB. The R3 is the better board for me in
+almost every way, but the HHKB got one thing exactly right, and I missed it
+before the first day was out: **Ctrl sits where Caps Lock normally does.**
+
+That placement is genius. Ctrl is a modifier you hold constantly, so it belongs
+under your little finger on the home row rather than exiled to the bottom
+corner. The HHKB doesn't give Caps Lock a key of its own at all, and in all
+those years I never once went looking for it.
+
+So the R3's Caps Lock had to go. `caps:ctrl_shifted_capslock` does that in a
+single line — but a Caps key that has become Ctrl is a key that no longer tells
+you anything. This app is the other half of that remap: the indicator you gave
+up, and a way to hand the key back on the rare day you want it.
 
 ## AI Use
 
 Is this another vibe coded repo?
 
-Yes it is. 
+Yes it is.
 
 ## The three modes
 
