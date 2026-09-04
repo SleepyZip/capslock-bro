@@ -13,7 +13,7 @@ GRACE_TICKS = 3            # let sysfs catch up before trusting a disagreement
 class Indicator:
     def __init__(self, app):
         self.app = app
-        self.icons = icons.load_all()
+        self.icons = icons.load_all()   # {state name: QIcon}
         self.state = False
         self.shown = None
         self.real_state = False
@@ -191,15 +191,19 @@ class Indicator:
         self.status.setText(label)
         self.tray.setToolTip("\n".join(tip))
 
-    def _set_icon(self, key):
-        if key != self.shown:
-            self.shown = key
-            self.tray.setIcon(self.icons[key])
+    def _is_ctrl(self):
+        """True when the Caps key is acting as Ctrl, in either Ctrl mode."""
+        return bool(xkb.active_mode())
+
+    def _set_icon(self, state):
+        if state != self.shown:
+            self.shown = state
+            self.tray.setIcon(self.icons[state])
 
     def tick(self):
         if self.show is not None:
             # The LEDs are ours right now; infer nothing from them.
-            self._set_icon((True, True))
+            self._set_icon(icons.state_name(self._is_ctrl(), False, True))
             self.update_text()
             return
         on = leds.caps_led_on()
@@ -212,5 +216,6 @@ class Indicator:
             self.override = None
             self.force_action.setChecked(False)
         self.state = on
-        self._set_icon((on, self.override is not None))
+        forced = self.override is not None
+        self._set_icon(icons.state_name(self._is_ctrl(), on, forced))
         self.update_text()

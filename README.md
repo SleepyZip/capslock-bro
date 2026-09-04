@@ -149,23 +149,33 @@ stops, including on quit. It will not leave someone's keyboard lit up.
 
 ## Icons
 
-The keycap art ships with the package. Caps Lock on wears sunglasses; the
-violet variants mean the LED is being driven by hand rather than by a real
-lock.
+The icon tells you **what the Caps key does**, because that's the thing you
+forget. Sunglasses mean it's acting as Ctrl; a plain keycap means it's an
+ordinary Caps Lock. A tint layers the current state on top:
 
-To use your own, drop images into `~/.config/capslock-bro/icons/`, named for
-the state:
+| | standard | amber | violet |
+|---|---|---|---|
+| **Sunglasses** — Caps is Ctrl | idle | Caps Lock genuinely on | LEDs driven by hand |
+| **Plain keycap** — normal Caps Lock | off | Caps Lock on | LEDs driven by hand |
+
+Only two base images ship. The amber and violet variants are composited at
+load time, so your own art inherits them for free.
+
+To use your own, drop images into `~/.config/capslock-bro/icons/`:
 
 ```
-off.png          on.png
-forced-off.png   forced-on.png
+ctrl.png     normal.png            # the two you probably want
+ctrl-locked.png     ctrl-forced.png       # optional, override the tint
+normal-locked.png   normal-forced.png
 ```
 
-`.svg`, `.png`, `.svgz` and `.xpm` are accepted. Resolution is **per state** —
-user art, then the bundled art, then a drawn fallback — so replacing one icon
-doesn't oblige you to supply the other three. Tray icons render around 22px,
-so favour bold shapes over detail: the sunglasses work at that size because
-they change the silhouette, not the detail.
+`.svg`, `.png`, `.svgz` and `.xpm` are accepted. Each state resolves as: your
+art for that exact state, else bundled art for it, else the base art tinted,
+else a drawn fallback — per state rather than all-or-nothing.
+
+Tray icons render around 22px, so favour bold shapes over detail. The
+sunglasses survive that because they change the silhouette rather than adding
+detail.
 
 ## Why not Fn + Caps Lock?
 

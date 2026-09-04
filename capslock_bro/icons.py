@@ -1,10 +1,10 @@
 """Tray icons.
 
-Art ships in assets/ and is overridable per state by dropping image files
-into ~/.config/capslock-bro/icons/ — see README. The drawn fallback exists
-for states with no art at all; its colours are fixed rather than themed,
-because Plasma does not recolour StatusNotifierItem pixmaps, and these read
-on light and dark panels alike.
+Two pieces of art carry the meaning: sunglasses when the Caps key is acting
+as Ctrl, a plain keycap when it is an ordinary Caps Lock. Tints layer state on
+top of that — amber when Caps Lock is actually on, violet when the LEDs are
+being driven by hand. Tints are composited at load time, so custom art gets
+them for free.
 """
 
 import os
@@ -12,76 +12,96 @@ import os
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 
-ON_COLOR = "#e8542f"      # a genuine Caps Lock
-OFF_COLOR = "#8a8a8a"      # dark
-FORCED_COLOR = "#7d5bed"   # driven by hand, not a real lock
+LOCKED_COLOR = "#e8542f"   # Caps Lock genuinely on
+FORCED_COLOR = "#7d5bed"   # LEDs driven by hand, not by a lock
+NEUTRAL_COLOR = "#8a8a8a"  # only used by the drawn fallback
+
+TINT_STRENGTH = 0.55
 
 USER_DIR = os.path.expanduser("~/.config/capslock-bro/icons")
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 SUFFIXES = (".svg", ".png", ".svgz", ".xpm")
 
-STATES = ("off", "on", "forced-off", "forced-on")
+BASES = ("ctrl", "normal")
+VARIANTS = ("", "-locked", "-forced")
+STATES = tuple(b + v for b in BASES for v in VARIANTS)
+
+_TINTS = {"": None, "-locked": LOCKED_COLOR, "-forced": FORCED_COLOR}
 
 
-def _icon_from(directory, state):
+def state_name(is_ctrl, locked, forced):
+    """The icon state for a given situation. Forced outranks locked."""
+    base = "ctrl" if is_ctrl else "normal"
+    if forced:
+        return base + "-forced"
+    if locked:
+        return base + "-locked"
+    return base
+
+
+def _pixmap_from(directory, name):
     for suffix in SUFFIXES:
-        path = os.path.join(directory, state + suffix)
+        path = os.path.join(directory, name + suffix)
         if os.path.isfile(path):
-            icon = QIcon(path)
-            if not icon.isNull():
-                return icon
+            pm = QPixmap(path)
+            if not pm.isNull():
+                return pm
     return None
 
 
-def _user_icon(state):
-    return _icon_from(USER_DIR, state)
+def _tint(pm, color):
+    """Colourise while preserving the alpha channel."""
+    out = QPixmap(pm)
+    p = QPainter(out)
+    p.setCompositionMode(QPainter.CompositionMode_SourceAtop)
+    c = QColor(color)
+    c.setAlphaF(TINT_STRENGTH)
+    p.fillRect(out.rect(), c)
+    p.end()
+    return out
 
 
-def _bundled_icon(state):
-    return _icon_from(ASSET_DIR, state)
-
-
-def draw(on, forced=False):
-    """An 'A' badge: filled when the LED is lit, outlined when dark."""
+def draw(is_ctrl, color):
+    """Fallback for when no art is available at all."""
     size = 64
-    lit = FORCED_COLOR if forced else ON_COLOR
-    dark = FORCED_COLOR if forced else OFF_COLOR
     pm = QPixmap(size, size)
     pm.fill(Qt.transparent)
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
-    if on:
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(lit))
-        p.drawRoundedRect(2, 2, size - 4, size - 4, 14, 14)
-        p.setPen(QColor("#ffffff"))
-    else:
-        pen = QPen(QColor(dark))
-        pen.setWidth(6)
-        p.setPen(pen)
-        p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(5, 5, size - 10, size - 10, 13, 13)
-        p.setPen(QColor(dark))
+    pen = QPen(QColor(color))
+    pen.setWidth(6)
+    p.setPen(pen)
+    p.setBrush(Qt.NoBrush)
+    p.drawRoundedRect(5, 5, size - 10, size - 10, 13, 13)
+    p.setPen(QColor(color))
     font = QFont()
     font.setPixelSize(40)
     font.setBold(True)
     p.setFont(font)
-    p.drawText(pm.rect(), Qt.AlignCenter, "A")
+    p.drawText(pm.rect(), Qt.AlignCenter, "^" if is_ctrl else "A")
     p.end()
-    return QIcon(pm)
+    return pm
 
 
 def load_all():
-    """{(on, forced): QIcon} — user art, else bundled art, else drawn.
+    """{state: QIcon} for every state.
 
-    Resolution is per state rather than all-or-nothing, so replacing a single
-    icon does not oblige you to supply the other three.
+    Each state resolves as: user art for that exact state, else the bundled
+    art for that exact state, else the base art tinted for the variant, else
+    a drawn fallback. Per state rather than all-or-nothing, so replacing one
+    icon does not oblige you to supply the rest.
     """
     icons = {}
-    for on in (False, True):
-        for forced in (False, True):
-            state = ("forced-" if forced else "") + ("on" if on else "off")
-            icons[(on, forced)] = (_user_icon(state)
-                                   or _bundled_icon(state)
-                                   or draw(on, forced))
+    for base in BASES:
+        for variant in VARIANTS:
+            state = base + variant
+            pm = _pixmap_from(USER_DIR, state) or _pixmap_from(ASSET_DIR, state)
+            if pm is None:
+                root = _pixmap_from(USER_DIR, base) or _pixmap_from(ASSET_DIR, base)
+                tint = _TINTS[variant]
+                if root is not None:
+                    pm = _tint(root, tint) if tint else root
+                else:
+                    pm = draw(base == "ctrl", tint or NEUTRAL_COLOR)
+            icons[state] = QIcon(pm)
     return icons
