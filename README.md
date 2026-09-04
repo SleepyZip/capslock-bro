@@ -147,18 +147,25 @@ broken one.
 Your real lock states are captured when a show starts and restored when it
 stops, including on quit. It will not leave someone's keyboard lit up.
 
-## Custom icons
+## Icons
 
-Drop images into `~/.config/capslock-bro/icons/`, named for the state:
+The keycap art ships with the package. Caps Lock on wears sunglasses; the
+violet variants mean the LED is being driven by hand rather than by a real
+lock.
+
+To use your own, drop images into `~/.config/capslock-bro/icons/`, named for
+the state:
 
 ```
-off.svg          on.svg
-forced-off.svg   forced-on.svg
+off.png          on.png
+forced-off.png   forced-on.png
 ```
 
-`.svg`, `.png`, `.svgz` and `.xpm` are accepted, first match wins, and anything
-you leave out falls back to the drawn default. Tray icons render around 22px,
-so favour bold shapes over detail.
+`.svg`, `.png`, `.svgz` and `.xpm` are accepted. Resolution is **per state** —
+user art, then the bundled art, then a drawn fallback — so replacing one icon
+doesn't oblige you to supply the other three. Tray icons render around 22px,
+so favour bold shapes over detail: the sunglasses work at that size because
+they change the silhouette, not the detail.
 
 ## Why not Fn + Caps Lock?
 
